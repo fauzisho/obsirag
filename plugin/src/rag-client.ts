@@ -56,6 +56,14 @@ export class RagClient {
         return resp.json;
     }
 
+    async reconnect(): Promise<void> {
+        await requestUrl({
+            url: `${this.baseUrl}/reconnect`,
+            method: "POST",
+            throw: true,
+        });
+    }
+
     async clearIndex(): Promise<void> {
         await requestUrl({
             url: `${this.baseUrl}/index`,

@@ -85,8 +85,23 @@ async def query_rag(req: QueryRequest) -> dict:
         raise HTTPException(503, "Engine not initialized — wait for /health to return engine_ready: true")
     if indexing_status["running"]:
         raise HTTPException(503, "Indexing in progress — please wait")
-    result = await main.engine.query(req.question, req.mode)
+    try:
+        result = await main.engine.query(req.question, req.mode)
+    except Exception as exc:
+        raise HTTPException(502, f"LLM query failed: {exc}. Try POST /reconnect to refresh the engine.")
+    if not result:
+        raise HTTPException(502, "LLM returned empty answer — OpenAI connection may be stale (e.g. after sleep). Try POST /reconnect.")
     return {"answer": result, "mode": req.mode}
+
+
+@router.post("/reconnect")
+async def reconnect_engine() -> dict:
+    """Reinitialize the LightRAG engine to refresh broken HTTP sessions (e.g. after laptop sleep/wake)."""
+    import main
+    if main.engine is None:
+        raise HTTPException(503, "Engine not initialized")
+    await main.engine.initialize()
+    return {"message": "engine reinitialized"}
 
 
 @router.delete("/index")

@@ -1,5 +1,5 @@
 import { App, Modal, Notice } from "obsidian";
-import { spawn, ChildProcess } from "child_process";
+import { spawn, exec, ChildProcess } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import * as net from "net";
@@ -37,6 +37,8 @@ export class BackendManager {
     private restartAttempts = 0;
     private readonly maxRestarts = 3;
     private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
+    private lastSeenAlive = 0;
+    private focusHandler: (() => void) | null = null;
 
     constructor(
         private app: App,
@@ -124,13 +126,15 @@ export class BackendManager {
             }
         });
 
-        this.waitForHealthy(20000).then((ok) => {
+        const startNotice = new Notice("RAG: backend starting…", 0); // 0 = persist until dismissed
+        this.waitForHealthy(90000).then((ok) => {
+            startNotice.hide();
             if (ok) {
                 new Notice("RAG: backend ready.");
                 this.restartAttempts = 0;
                 this.startHealthMonitor();
             } else {
-                new Notice("RAG: backend did not respond within 20s. Check console.");
+                new Notice("RAG: backend did not respond within 90s. Check console.");
             }
         });
     }
@@ -145,13 +149,36 @@ export class BackendManager {
     }
 
     private startHealthMonitor(): void {
+        this.lastSeenAlive = Date.now();
+
         this.healthCheckInterval = setInterval(async () => {
             const ok = await this.ragClient.healthCheck();
-            if (!ok) {
+            if (ok) {
+                this.lastSeenAlive = Date.now();
+            } else {
                 console.warn("[RAG Backend] health check failed");
                 this.stopHealthMonitor();
+                // If we own the process, let the exit handler restart it.
+                // If it's an external process (port was already busy), try reconnect.
+                if (!this.process) {
+                    await this.tryReconnect();
+                }
             }
         }, 30_000);
+
+        // Detect wake-from-sleep via window focus. macOS suspends processes
+        // during sleep, so HTTP sessions inside the Python backend become stale.
+        // Reconnect to refresh them when the user returns to Obsidian.
+        this.focusHandler = async () => {
+            const gapMs = Date.now() - this.lastSeenAlive;
+            // Only reconnect if we've been away for more than 60 s (real sleep, not just focus loss)
+            if (gapMs > 60_000) {
+                console.log(`[RAG Backend] Wake detected (gap ${Math.round(gapMs / 1000)}s) — reconnecting engine…`);
+                await this.tryReconnect();
+            }
+            this.lastSeenAlive = Date.now();
+        };
+        window.addEventListener("focus", this.focusHandler);
     }
 
     private stopHealthMonitor(): void {
@@ -159,6 +186,46 @@ export class BackendManager {
             clearInterval(this.healthCheckInterval);
             this.healthCheckInterval = null;
         }
+        if (this.focusHandler !== null) {
+            window.removeEventListener("focus", this.focusHandler);
+            this.focusHandler = null;
+        }
+    }
+
+    async tryReconnect(): Promise<void> {
+        // Try the fast /reconnect endpoint first (only available in newer binary builds).
+        // Fall back to a full process restart if the endpoint doesn't exist.
+        try {
+            await this.ragClient.reconnect();
+            new Notice("RAG: engine reconnected.");
+            this.startHealthMonitor();
+            return;
+        } catch (e) {
+            console.warn("[RAG Backend] /reconnect not available, falling back to full restart:", e);
+        }
+
+        new Notice("RAG: restarting backend…");
+        this.stopHealthMonitor();
+
+        // If we own the process, kill it gracefully. Otherwise kill whatever is on the port.
+        if (this.process) {
+            await this.stop();
+        } else {
+            await this.killPortOccupant(this.settings.backendPort);
+        }
+
+        await sleep(1500);
+        this.restartAttempts = 0;
+        this.spawnBackend();
+    }
+
+    private killPortOccupant(port: number): Promise<void> {
+        return new Promise((resolve) => {
+            const cmd = process.platform === "win32"
+                ? `for /f "tokens=5" %a in ('netstat -aon ^| findstr :${port}') do taskkill /F /PID %a`
+                : `lsof -ti tcp:${port} | xargs kill -9`;
+            exec(cmd, () => resolve()); // ignore errors (process may already be gone)
+        });
     }
 
     async stop(): Promise<void> {

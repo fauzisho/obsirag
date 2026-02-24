@@ -63,6 +63,16 @@ export function registerIndexCommands(plugin: ObsiRagPlugin): void {
             }
         },
     });
+
+    // Reconnect engine (useful after laptop sleep/wake breaks OpenAI sessions)
+    plugin.addCommand({
+        id: "reconnect-engine",
+        name: "Reconnect RAG engine (fix after sleep/wake)",
+        callback: async () => {
+            new Notice("RAG: reconnecting engine…");
+            await plugin.backendManager.tryReconnect();
+        },
+    });
 }
 
 async function indexFiles(plugin: ObsiRagPlugin, files: TFile[]): Promise<void> {
