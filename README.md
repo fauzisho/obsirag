@@ -21,6 +21,13 @@ Uses **LightRAG** (knowledge graph + hybrid vector retrieval) with a Python back
 3. On first launch a download modal appears — click OK to download the ~100MB backend binary (one time only)
 4. Configure your LLM provider in Settings → Obsidian RAG
 
+## DevOps & Release Lifecycle
+
+See **[DEVOPS.md](DEVOPS.md)** for the full guide:
+local dev → binary rebuild → commit → tag → CI release → production download test.
+
+---
+
 ## Development
 
 ### Backend
