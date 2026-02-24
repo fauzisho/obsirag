@@ -122,10 +122,12 @@ async def get_graph(limit: int = 300) -> dict:
     tree = ET.parse(graphml_path)
     root = tree.getroot()
 
-    # GraphML namespace (networkx uses this)
-    ns = "http://graphml.graphdrawing.org/graphml"
+    # Detect the actual namespace from the root element (networkx may use
+    # either .../graphml or .../xmlns depending on version)
+    raw_tag = root.tag  # e.g. "{http://graphml.graphdrawing.org/xmlns}graphml"
+    ns = raw_tag.split("}")[0].lstrip("{") if "}" in raw_tag else ""
     def tag(name: str) -> str:
-        return f"{{{ns}}}{name}"
+        return f"{{{ns}}}{name}" if ns else name
 
     # Build key-id → attr-name mapping
     keys: dict[str, str] = {}
