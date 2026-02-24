@@ -64,6 +64,15 @@ export class RagClient {
         });
     }
 
+    async getGraph(): Promise<{ nodes: any[]; edges: any[]; stats: { entities: number; relations: number } }> {
+        const resp = await requestUrl({
+            url: `${this.baseUrl}/graph`,
+            method: "GET",
+            throw: true,
+        });
+        return resp.json;
+    }
+
     async clearIndex(): Promise<void> {
         await requestUrl({
             url: `${this.baseUrl}/index`,
