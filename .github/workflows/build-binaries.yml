@@ -20,7 +20,7 @@ jobs:
             artifact_name: obsirag-backend-linux
           - os: windows-2022
             artifact_name: obsirag-backend-windows.exe
-          - os: macos-13
+          - os: macos-14
             artifact_name: obsirag-backend-macos
 
     runs-on: ${{ matrix.os }}
