@@ -1,0 +1,130 @@
+name: Build Backend Binaries
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag for the release (e.g. v0.1.0)"
+        required: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            artifact_name: obsirag-backend-linux
+          - os: windows-2022
+            artifact_name: obsirag-backend-windows.exe
+          - os: macos-13
+            artifact_name: obsirag-backend-macos
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      # ── Tesseract (needed at build time for pytesseract) ──────────────
+      - name: Install Tesseract (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-eng upx-ucl
+
+      - name: Install Tesseract (macOS)
+        if: runner.os == 'macOS'
+        run: brew install tesseract upx
+
+      - name: Install Tesseract (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install tesseract --yes --no-progress
+          echo "C:\Program Files\Tesseract-OCR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        shell: pwsh
+
+      # ── Python deps ───────────────────────────────────────────────────
+      - name: Install Python dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ── Build ─────────────────────────────────────────────────────────
+      - name: Build with PyInstaller
+        working-directory: backend
+        run: pyinstaller build.spec --noconfirm --clean
+
+      # ── Rename artifact ───────────────────────────────────────────────
+      - name: Rename artifact (Linux / macOS)
+        if: runner.os != 'Windows'
+        working-directory: backend/dist
+        run: mv obsirag-backend ${{ matrix.artifact_name }}
+
+      - name: Rename artifact (Windows)
+        if: runner.os == 'Windows'
+        working-directory: backend/dist
+        run: Rename-Item obsirag-backend.exe ${{ matrix.artifact_name }}
+        shell: pwsh
+
+      # ── Ad-hoc code sign for macOS (removes Gatekeeper quarantine) ───
+      - name: Ad-hoc sign binary (macOS)
+        if: runner.os == 'macOS'
+        working-directory: backend/dist
+        run: codesign --deep --force --sign - ${{ matrix.artifact_name }}
+
+      # ── Checksum ──────────────────────────────────────────────────────
+      - name: Generate SHA-256 checksum (Linux / macOS)
+        if: runner.os != 'Windows'
+        working-directory: backend/dist
+        run: shasum -a 256 ${{ matrix.artifact_name }} > ${{ matrix.artifact_name }}.sha256
+
+      - name: Generate SHA-256 checksum (Windows)
+        if: runner.os == 'Windows'
+        working-directory: backend/dist
+        run: |
+          $hash = (Get-FileHash -Algorithm SHA256 "${{ matrix.artifact_name }}").Hash.ToLower()
+          "$hash  ${{ matrix.artifact_name }}" | Out-File "${{ matrix.artifact_name }}.sha256" -Encoding utf8
+        shell: pwsh
+
+      # ── Upload artifact ───────────────────────────────────────────────
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            backend/dist/${{ matrix.artifact_name }}
+            backend/dist/${{ matrix.artifact_name }}.sha256
+
+  # ── Create GitHub Release ─────────────────────────────────────────────
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}

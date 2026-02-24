@@ -1,0 +1,173 @@
+/* ── ObsiRAG Chat View ───────────────────────────────────────────────────── */
+
+.rag-chat-root {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* ── Messages area ──────────────────────────────────────────────────────── */
+
+.rag-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.rag-message {
+    max-width: 85%;
+    padding: 8px 12px;
+    border-radius: 8px;
+    word-wrap: break-word;
+    line-height: 1.5;
+    font-size: var(--font-text-size);
+}
+
+.rag-user {
+    align-self: flex-end;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-bottom-right-radius: 2px;
+}
+
+.rag-assistant {
+    align-self: flex-start;
+    background-color: var(--background-secondary);
+    color: var(--text-normal);
+    border-bottom-left-radius: 2px;
+}
+
+/* Thinking indicator */
+.rag-thinking {
+    opacity: 0.6;
+    font-style: italic;
+    animation: rag-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes rag-pulse {
+    0%, 100% { opacity: 0.6; }
+    50%       { opacity: 1;   }
+}
+
+/* ── Input row ──────────────────────────────────────────────────────────── */
+
+.rag-input-row {
+    padding: 8px 12px 4px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.rag-input {
+    width: 100%;
+    resize: none;
+    box-sizing: border-box;
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: var(--font-text-size);
+    font-family: var(--font-text);
+    line-height: 1.5;
+    transition: border-color 0.15s ease;
+}
+
+.rag-input:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+}
+
+/* ── Control row ────────────────────────────────────────────────────────── */
+
+.rag-control-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px 10px;
+}
+
+.rag-mode-select {
+    flex: 1;
+    background-color: var(--background-secondary);
+    color: var(--text-muted);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: var(--font-smaller);
+    cursor: pointer;
+}
+
+.rag-mode-select:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+}
+
+.rag-clear-btn {
+    font-size: var(--font-smaller);
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--background-modifier-border);
+    cursor: pointer;
+    transition: color 0.1s ease, border-color 0.1s ease;
+}
+
+.rag-clear-btn:hover {
+    color: var(--text-normal);
+    border-color: var(--text-muted);
+}
+
+.rag-send-btn {
+    padding: 4px 14px;
+    border-radius: 4px;
+    font-size: var(--font-smaller);
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.rag-send-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ── Markdown inside assistant bubbles ──────────────────────────────────── */
+
+.rag-assistant p:first-child { margin-top: 0; }
+.rag-assistant p:last-child  { margin-bottom: 0; }
+
+.rag-assistant pre {
+    background-color: var(--background-primary);
+    border-radius: 4px;
+    padding: 8px;
+    overflow-x: auto;
+    font-size: var(--font-smaller);
+}
+
+.rag-assistant code {
+    font-size: var(--font-smaller);
+    background-color: var(--background-primary);
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
+.rag-assistant pre code {
+    background: none;
+    padding: 0;
+}
+
+.rag-assistant ul,
+.rag-assistant ol {
+    padding-left: 1.4em;
+    margin: 4px 0;
+}
+
+.rag-assistant blockquote {
+    border-left: 3px solid var(--interactive-accent);
+    margin: 4px 0;
+    padding-left: 10px;
+    color: var(--text-muted);
+}

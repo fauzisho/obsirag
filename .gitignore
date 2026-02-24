@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# PyInstaller
+build/
+dist/
+
+# Node.js
+node_modules/
+plugin/main.js
+plugin/main.js.map
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Vault RAG data (stored inside vault, not source control)
+.obsidian-rag/
+.obsirag/
+
+# Secrets
+.env
+*.env
+openai_key.txt
+
+# Claude Code
+.claude/
