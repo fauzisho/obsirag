@@ -5,6 +5,7 @@
     flex-direction: column;
     height: 100%;
     overflow: hidden;
+    background-color: var(--background-primary);
 }
 
 /* ── Messages area ──────────────────────────────────────────────────────── */
@@ -12,37 +13,51 @@
 .rag-messages {
     flex: 1;
     overflow-y: auto;
-    padding: 12px;
+    padding: 16px 12px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 16px;
 }
 
+/* Each turn is a row: avatar + bubble */
 .rag-message {
-    max-width: 85%;
-    padding: 8px 12px;
-    border-radius: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    max-width: 100%;
     word-wrap: break-word;
-    line-height: 1.5;
+    line-height: 1.6;
     font-size: var(--font-text-size);
+    /* allow text selection and drag */
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
 }
 
+/* User turn — push to the right */
 .rag-user {
-    align-self: flex-end;
+    flex-direction: row-reverse;
+}
+
+/* The bubble itself */
+.rag-user .rag-bubble {
     background-color: var(--interactive-accent);
     color: var(--text-on-accent);
-    border-bottom-right-radius: 2px;
+    padding: 9px 14px;
+    border-radius: 18px 18px 4px 18px;
+    max-width: 78%;
 }
 
-.rag-assistant {
-    align-self: flex-start;
+.rag-assistant .rag-bubble {
     background-color: var(--background-secondary);
     color: var(--text-normal);
-    border-bottom-left-radius: 2px;
+    padding: 10px 14px;
+    border-radius: 4px 18px 18px 18px;
+    max-width: 92%;
 }
 
 /* Thinking indicator */
-.rag-thinking {
+.rag-thinking .rag-bubble {
     opacity: 0.6;
     font-style: italic;
     animation: rag-pulse 1.2s ease-in-out infinite;
@@ -51,6 +66,71 @@
 @keyframes rag-pulse {
     0%, 100% { opacity: 0.6; }
     50%       { opacity: 1;   }
+}
+
+/* ── Markdown inside assistant bubbles ──────────────────────────────────── */
+
+.rag-assistant .rag-bubble p:first-child { margin-top: 0; }
+.rag-assistant .rag-bubble p:last-child  { margin-bottom: 0; }
+
+.rag-assistant .rag-bubble pre {
+    background-color: var(--background-primary);
+    border-radius: 6px;
+    padding: 10px;
+    overflow-x: auto;
+    font-size: var(--font-smaller);
+    margin: 6px 0;
+}
+
+.rag-assistant .rag-bubble code {
+    font-size: var(--font-smaller);
+    background-color: var(--background-primary);
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
+.rag-assistant .rag-bubble pre code {
+    background: none;
+    padding: 0;
+}
+
+.rag-assistant .rag-bubble ul,
+.rag-assistant .rag-bubble ol {
+    padding-left: 1.4em;
+    margin: 4px 0;
+}
+
+.rag-assistant .rag-bubble blockquote {
+    border-left: 3px solid var(--interactive-accent);
+    margin: 4px 0;
+    padding-left: 10px;
+    color: var(--text-muted);
+}
+
+/* ── Source references ──────────────────────────────────────────────────── */
+
+.rag-sources {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid var(--background-modifier-border);
+    font-size: var(--font-smaller);
+    color: var(--text-muted);
+    line-height: 1.8;
+}
+
+.rag-sources-label {
+    font-weight: 600;
+}
+
+.rag-source-link {
+    color: var(--link-color);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.rag-source-link:hover {
+    text-decoration: underline;
+    color: var(--link-color-hover);
 }
 
 /* ── Input row ──────────────────────────────────────────────────────────── */
@@ -67,8 +147,8 @@
     background-color: var(--background-primary);
     color: var(--text-normal);
     border: 1px solid var(--background-modifier-border);
-    border-radius: 6px;
-    padding: 8px 10px;
+    border-radius: 10px;
+    padding: 9px 12px;
     font-size: var(--font-text-size);
     font-family: var(--font-text);
     line-height: 1.5;
@@ -94,7 +174,7 @@
     background-color: var(--background-secondary);
     color: var(--text-muted);
     border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
+    border-radius: 6px;
     padding: 4px 6px;
     font-size: var(--font-smaller);
     cursor: pointer;
@@ -108,7 +188,7 @@
 .rag-clear-btn {
     font-size: var(--font-smaller);
     padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: 6px;
     color: var(--text-muted);
     background: transparent;
     border: 1px solid var(--background-modifier-border);
@@ -123,7 +203,7 @@
 
 .rag-send-btn {
     padding: 4px 14px;
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: var(--font-smaller);
     font-weight: 500;
     cursor: pointer;
@@ -132,42 +212,4 @@
 .rag-send-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-}
-
-/* ── Markdown inside assistant bubbles ──────────────────────────────────── */
-
-.rag-assistant p:first-child { margin-top: 0; }
-.rag-assistant p:last-child  { margin-bottom: 0; }
-
-.rag-assistant pre {
-    background-color: var(--background-primary);
-    border-radius: 4px;
-    padding: 8px;
-    overflow-x: auto;
-    font-size: var(--font-smaller);
-}
-
-.rag-assistant code {
-    font-size: var(--font-smaller);
-    background-color: var(--background-primary);
-    padding: 1px 4px;
-    border-radius: 3px;
-}
-
-.rag-assistant pre code {
-    background: none;
-    padding: 0;
-}
-
-.rag-assistant ul,
-.rag-assistant ol {
-    padding-left: 1.4em;
-    margin: 4px 0;
-}
-
-.rag-assistant blockquote {
-    border-left: 3px solid var(--interactive-accent);
-    margin: 4px 0;
-    padding-left: 10px;
-    color: var(--text-muted);
 }

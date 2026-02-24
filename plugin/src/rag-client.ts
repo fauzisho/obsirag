@@ -45,7 +45,7 @@ export class RagClient {
         return resp.json;
     }
 
-    async query(req: QueryRequest): Promise<{ answer: string; mode: string }> {
+    async query(req: QueryRequest): Promise<{ answer: string; mode: string; sources?: string[] }> {
         const resp = await requestUrl({
             url: `${this.baseUrl}/query`,
             method: "POST",

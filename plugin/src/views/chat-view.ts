@@ -6,6 +6,7 @@ export const CHAT_VIEW_TYPE = "obsirag-chat";
 interface Message {
     role: "user" | "assistant";
     content: string;
+    sources?: string[];
 }
 
 export class ChatView extends ItemView {
@@ -84,7 +85,7 @@ export class ChatView extends ItemView {
         this.sendBtn.setText("…");
 
         const thinkingEl = this.messagesEl.createDiv({ cls: "rag-message rag-assistant rag-thinking" });
-        thinkingEl.setText("Thinking…");
+        thinkingEl.createDiv({ cls: "rag-bubble", text: "Thinking…" });
         thinkingEl.scrollIntoView({ behavior: "smooth" });
 
         try {
@@ -93,7 +94,7 @@ export class ChatView extends ItemView {
                 mode: this.plugin.settings.queryMode,
             });
             thinkingEl.remove();
-            this.appendMessage({ role: "assistant", content: result.answer });
+            this.appendMessage({ role: "assistant", content: result.answer, sources: result.sources });
         } catch (err) {
             thinkingEl.remove();
             const msg = err instanceof Error ? err.message : String(err);
@@ -110,11 +111,33 @@ export class ChatView extends ItemView {
     private appendMessage(msg: Message): void {
         this.messages.push(msg);
         const el = this.messagesEl.createDiv({ cls: `rag-message rag-${msg.role}` });
+        const bubble = el.createDiv({ cls: "rag-bubble" });
 
         if (msg.role === "assistant") {
-            MarkdownRenderer.render(this.app, msg.content, el, "", this);
+            MarkdownRenderer.render(this.app, msg.content, bubble, "", this);
+
+            if (msg.sources && msg.sources.length > 0) {
+                const sourcesEl = bubble.createDiv({ cls: "rag-sources" });
+                sourcesEl.createEl("span", { text: "Sources: ", cls: "rag-sources-label" });
+
+                msg.sources.forEach((src, i) => {
+                    if (i > 0) sourcesEl.createEl("span", { text: " · ", cls: "rag-sources-sep" });
+
+                    const fileName = (src.split("/").pop() ?? src).replace(/\.md$/i, "");
+                    const link = sourcesEl.createEl("a", {
+                        text: fileName,
+                        cls: "rag-source-link",
+                        attr: { href: "#", title: src },
+                    });
+                    link.addEventListener("click", (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.app.workspace.openLinkText(src, "", false);
+                    });
+                });
+            }
         } else {
-            el.createEl("p", { text: msg.content });
+            bubble.createEl("p", { text: msg.content });
         }
 
         el.scrollIntoView({ behavior: "smooth" });

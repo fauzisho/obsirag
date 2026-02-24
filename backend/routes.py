@@ -4,6 +4,7 @@ FastAPI route handlers. Imports main.engine at call time to avoid circular impor
 """
 
 import asyncio
+import os
 from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
@@ -46,11 +47,11 @@ async def health() -> dict:
 async def index_documents(req: IndexRequest, background_tasks: BackgroundTasks) -> dict:
     if not req.paths:
         raise HTTPException(400, "No paths provided")
-    background_tasks.add_task(_index_worker, req.paths)
+    background_tasks.add_task(_index_worker, req.paths, req.vault_path)
     return {"message": "indexing started", "count": len(req.paths)}
 
 
-async def _index_worker(paths: list[str]) -> None:
+async def _index_worker(paths: list[str], vault_path: str) -> None:
     import main
 
     indexing_status["running"] = True
@@ -63,7 +64,9 @@ async def _index_worker(paths: list[str]) -> None:
         try:
             text = await asyncio.to_thread(parse_document, path)
             if text:
-                await main.engine.insert_texts([text])
+                # Store relative path so the plugin can open the note
+                rel_path = os.path.relpath(path, vault_path) if vault_path else path
+                await main.engine.insert_document(text, rel_path)
         except Exception as exc:
             indexing_status["errors"].append({"file": path, "error": str(exc)})
         finally:
@@ -86,12 +89,12 @@ async def query_rag(req: QueryRequest) -> dict:
     if indexing_status["running"]:
         raise HTTPException(503, "Indexing in progress — please wait")
     try:
-        result = await main.engine.query(req.question, req.mode)
+        answer, sources = await main.engine.query_with_sources(req.question, req.mode)
     except Exception as exc:
         raise HTTPException(502, f"LLM query failed: {exc}. Try POST /reconnect to refresh the engine.")
-    if not result:
+    if not answer:
         raise HTTPException(502, "LLM returned empty answer — OpenAI connection may be stale (e.g. after sleep). Try POST /reconnect.")
-    return {"answer": result, "mode": req.mode}
+    return {"answer": answer, "mode": req.mode, "sources": sources}
 
 
 @router.post("/reconnect")

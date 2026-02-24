@@ -56,7 +56,13 @@ export class BackendManager {
     }
 
     async start(): Promise<void> {
-        // 1. Ensure binary exists
+        // 1. Validate required settings before attempting spawn
+        if (!this.settings.openaiApiKey) {
+            new Notice("RAG: OpenAI API key is not set. Configure it in plugin settings.");
+            return;
+        }
+
+        // 2. Ensure binary exists
         if (!fs.existsSync(this.binaryPath)) {
             const downloaded = await this.promptDownload();
             if (!downloaded) {
@@ -65,8 +71,17 @@ export class BackendManager {
             }
         }
 
-        // 2. Check if port is already occupied
-        const portBusy = await isPortInUse(this.settings.backendPort);
+        // 3. Brief grace period so the OS fully releases the port after a recent stop()
+        await sleep(600);
+
+        // 4. Check if port is already occupied (retry once to handle transient state)
+        let portBusy = await isPortInUse(this.settings.backendPort);
+        if (!portBusy) {
+            // Double-check after another short wait — SIGKILL release can be non-instant
+            await sleep(300);
+            portBusy = await isPortInUse(this.settings.backendPort);
+        }
+
         if (portBusy) {
             const healthy = await this.ragClient.healthCheck();
             if (healthy) {
@@ -80,7 +95,7 @@ export class BackendManager {
             return;
         }
 
-        // 3. Spawn
+        // 5. Spawn
         this.spawnBackend();
     }
 
@@ -127,22 +142,25 @@ export class BackendManager {
         });
 
         const startNotice = new Notice("RAG: backend starting…", 0); // 0 = persist until dismissed
-        this.waitForHealthy(90000).then((ok) => {
+        this.waitForHealthy(60000, this.process).then((ok) => {
             startNotice.hide();
             if (ok) {
                 new Notice("RAG: backend ready.");
                 this.restartAttempts = 0;
                 this.startHealthMonitor();
             } else {
-                new Notice("RAG: backend did not respond within 90s. Check console.");
+                new Notice("RAG: backend did not respond. Check console for errors.");
             }
         });
     }
 
-    private async waitForHealthy(timeoutMs: number): Promise<boolean> {
+    private async waitForHealthy(timeoutMs: number, spawnedProcess: ChildProcess | null): Promise<boolean> {
         const deadline = Date.now() + timeoutMs;
         while (Date.now() < deadline) {
             if (await this.ragClient.healthCheck()) return true;
+            // Process exited before becoming healthy — abort immediately instead of
+            // waiting out the full timeout. The exit handler will handle restart logic.
+            if (this.process !== spawnedProcess) return false;
             await sleep(500);
         }
         return false;
@@ -237,6 +255,12 @@ export class BackendManager {
                 this.process.kill("SIGKILL");
             }
             this.process = null;
+        } else {
+            // Backend was adopted (started externally) — kill by port on disable
+            const portBusy = await isPortInUse(this.settings.backendPort);
+            if (portBusy) {
+                await this.killPortOccupant(this.settings.backendPort);
+            }
         }
     }
 
