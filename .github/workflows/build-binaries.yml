@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Tag for the release (e.g. v0.1.0)"
+        description: "First three digits of version :) (e.g. 0.1.0)"
         required: true
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
             artifact_name: obsirag-backend-linux
           - os: windows-2022
             artifact_name: obsirag-backend-windows.exe
-          - os: macos-14
+          - os: macos-13
             artifact_name: obsirag-backend-macos
 
     runs-on: ${{ matrix.os }}

@@ -1,4 +1,4 @@
-# Obsidian RAG
+# ObsiRAG
 
 An Obsidian plugin that brings RAG-Anything-level retrieval to your vault.
 Uses **LightRAG** (knowledge graph + hybrid vector retrieval) with a Python backend packaged as a **single auto-downloaded binary** — no Python installation required.
@@ -8,7 +8,7 @@ Uses **LightRAG** (knowledge graph + hybrid vector retrieval) with a Python back
 - Chat with your entire vault using a sidebar panel
 - Supports **Markdown, PDF, DOCX, XLSX, images (OCR)**
 - Knowledge graph + hybrid retrieval (LightRAG)
-- **Ollama** (fully local, free) or **OpenAI** (API key required)
+- **OpenAI** (API key required)
 - Index current file, current folder, or entire vault
 - Storage inside your vault at `.obsidian-rag/`
 
@@ -27,8 +27,6 @@ Uses **LightRAG** (knowledge graph + hybrid vector retrieval) with a Python back
 cd backend
 pip install -r requirements.txt
 
-# Test locally (requires Ollama running with nomic-embed-text + your LLM pulled)
-python main.py --vault-path ~/path/to/vault --provider ollama
 ```
 
 ### Plugin
@@ -75,21 +73,12 @@ FastAPI Server (Python binary, auto-downloaded)
   └── Storage: .obsidian-rag/ inside vault
 ```
 
-## Before You Begin (Ollama)
-
-Pull the required models:
-
-```bash
-ollama pull nomic-embed-text   # embeddings
-ollama pull gemma2:2b          # LLM (or any other model)
-```
-
 ## Important Files
 
 | File | Purpose |
 |------|---------|
 | `backend/main.py` | FastAPI entry point, CLI args, uvicorn |
-| `backend/rag_engine.py` | LightRAG setup, Ollama/OpenAI switching |
+| `backend/rag_engine.py` | LightRAG setup, OpenAI  |
 | `backend/document_parser.py` | Multi-format document parsing |
 | `backend/routes.py` | API route handlers |
 | `backend/build.spec` | PyInstaller spec (edit hidden_imports if build fails) |

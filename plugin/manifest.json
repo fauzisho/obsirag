@@ -3,8 +3,8 @@
     "name": "ObsiRAG",
     "version": "0.1.0",
     "minAppVersion": "1.4.0",
-    "description": "Chat with your vault using LightRAG (knowledge graph + hybrid retrieval). Supports Markdown, PDF, DOCX, XLSX, and images. Runs fully local via Ollama or with OpenAI.",
-    "author": "Your Name",
+    "description": "Chat with your vault using LightRAG (knowledge graph + hybrid retrieval). Supports Markdown, PDF, DOCX, XLSX, and images. Runs with OpenAI.",
+    "author": "Fauzi Sholichin",
     "authorUrl": "https://github.com/fauzisho/obsirag",
     "isDesktopOnly": true
 }

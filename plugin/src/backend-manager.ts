@@ -3,6 +3,7 @@ import { spawn, ChildProcess } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import * as net from "net";
+import * as https from "https";
 import type { RagSettings } from "./settings";
 import type { RagClient } from "./rag-client";
 
@@ -179,6 +180,57 @@ export class BackendManager {
     }
 }
 
+// ── HTTPS helpers (handle GitHub redirects, large files) ────────────────────
+
+function httpsGet(url: string): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+        https.get(url, { headers: { "User-Agent": "obsirag-plugin" } }, (res) => {
+            if (res.statusCode === 301 || res.statusCode === 302) {
+                httpsGet(res.headers.location!).then(resolve).catch(reject);
+                return;
+            }
+            if (res.statusCode !== 200) {
+                reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+                return;
+            }
+            const chunks: Buffer[] = [];
+            res.on("data", (c: Buffer) => chunks.push(c));
+            res.on("end", () => resolve(Buffer.concat(chunks)));
+            res.on("error", reject);
+        }).on("error", reject);
+    });
+}
+
+function httpsDownload(
+    url: string,
+    dest: string,
+    onProgress: (pct: number) => void
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        https.get(url, { headers: { "User-Agent": "obsirag-plugin" } }, (res) => {
+            if (res.statusCode === 301 || res.statusCode === 302) {
+                httpsDownload(res.headers.location!, dest, onProgress).then(resolve).catch(reject);
+                return;
+            }
+            if (res.statusCode !== 200) {
+                reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+                return;
+            }
+            const total = parseInt(res.headers["content-length"] ?? "0");
+            let received = 0;
+            const file = fs.createWriteStream(dest);
+            res.on("data", (chunk: Buffer) => {
+                received += chunk.length;
+                if (total > 0) onProgress(Math.round((received / total) * 100));
+            });
+            res.pipe(file);
+            file.on("finish", () => file.close(() => resolve()));
+            file.on("error", reject);
+            res.on("error", reject);
+        }).on("error", reject);
+    });
+}
+
 // ── Download Modal ──────────────────────────────────────────────────────────
 
 class DownloadModal extends Modal {
@@ -221,41 +273,26 @@ class DownloadModal extends Modal {
         const checksumUrl = `${downloadUrl}.sha256`;
 
         try {
-            // Step 1 — fetch expected SHA-256
+            // Step 1 — fetch expected SHA-256 via Node https
             this.statusEl.setText("Fetching checksum…");
-            const { requestUrl } = await import("obsidian");
-            const csResp = await requestUrl({ url: checksumUrl });
-            const expectedHash = csResp.text.trim().split(/\s+/)[0].toLowerCase();
+            const expectedHash = await httpsGet(checksumUrl)
+                .then((buf) => buf.toString("utf8").trim().split(/\s+/)[0].toLowerCase());
 
-            // Step 2 — stream binary for progress reporting
-            this.statusEl.setText("Downloading binary…");
-            const response = await fetch(downloadUrl);
-            if (!response.ok) throw new Error(`HTTP ${response.status} from ${downloadUrl}`);
+            // Step 2 — download binary via Node https (handles redirects, large files)
+            this.statusEl.setText("Downloading binary (~60-75 MB)…");
+            this.progressEl.removeAttribute("value");
+            fs.mkdirSync(this.binDir, { recursive: true });
+            const filePath = path.join(this.binDir, binaryName);
+            await httpsDownload(downloadUrl, filePath, (pct) => {
+                this.progressEl.value = pct;
+                this.statusEl.setText(`Downloading… ${pct}%`);
+            });
 
-            const contentLength = parseInt(response.headers.get("content-length") ?? "0");
-            const reader = response.body!.getReader();
-            const chunks: Uint8Array[] = [];
-            let received = 0;
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                chunks.push(value);
-                received += value.length;
-                if (contentLength > 0) {
-                    this.progressEl.value = Math.round((received / contentLength) * 100);
-                }
-            }
+            const buffer = new Uint8Array(fs.readFileSync(filePath).buffer);
 
             // Step 3 — verify checksum
             this.statusEl.setText("Verifying checksum…");
-            const totalLen = chunks.reduce((acc, c) => acc + c.length, 0);
-            const buffer = new Uint8Array(totalLen);
-            let offset = 0;
-            for (const chunk of chunks) {
-                buffer.set(chunk, offset);
-                offset += chunk.length;
-            }
+            this.progressEl.value = 95;
 
             const hashBuf = await crypto.subtle.digest("SHA-256", buffer);
             const actualHash = Array.from(new Uint8Array(hashBuf))
@@ -266,12 +303,8 @@ class DownloadModal extends Modal {
                 throw new Error(`Checksum mismatch.\nExpected: ${expectedHash}\nGot:      ${actualHash}`);
             }
 
-            // Step 4 — write to disk
+            // Step 4 — set permissions
             this.statusEl.setText("Installing…");
-            fs.mkdirSync(this.binDir, { recursive: true });
-            const filePath = path.join(this.binDir, binaryName);
-            fs.writeFileSync(filePath, buffer);
-
             if (process.platform !== "win32") {
                 fs.chmodSync(filePath, 0o755);
             }

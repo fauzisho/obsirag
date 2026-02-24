@@ -33,6 +33,13 @@ export default class ObsiRagPlugin extends Plugin {
         // Settings tab
         this.addSettingTab(new RagSettingTab(this.app, this));
 
+        // Command to open chat view
+        this.addCommand({
+            id: "open-chat",
+            name: "Open chat",
+            callback: () => this.activateChatView(),
+        });
+
         // Commands (index files, clear index)
         registerIndexCommands(this);
 
