@@ -3,6 +3,8 @@
 An Obsidian plugin that brings RAG-Anything-level retrieval to your vault.
 Uses **LightRAG** (knowledge graph + hybrid vector retrieval) with a Python backend packaged as a **single auto-downloaded binary** — no Python installation required.
 
+![ObsiRAG Screenshot](image/image1.png)
+
 ## Features
 
 - Chat with your entire vault using a sidebar panel
